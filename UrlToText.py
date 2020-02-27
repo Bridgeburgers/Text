@@ -6,12 +6,14 @@ import numpy as np
 def CleanCorpus(corpus):
     
     spaceStrings = ['\ufeff', '\r', '\n', ' ']
-    punctuation = [',', ';', '-', ':', '_']
+    punctuation = [',', ';', '-', ':', '_', '']
     
     corpus = corpus.lower()
     corpus = re.sub('[' + ''.join(spaceStrings) + ']+', ' ', corpus)
     for punc in punctuation:
         corpus = re.sub(punc, ' ' + punc, corpus)
+
+    corpus = re.sub(r"([^ ])", r" \1", corpus)
 
     #separate dashes and underscores preceding characters
     corpus = re.sub(r'-(\w)', r'- \1', corpus)
@@ -21,13 +23,18 @@ def CleanCorpus(corpus):
     corpus = re.sub(r'\((\w)', r'( \1', corpus)
     corpus = re.sub(r'(\w)\)', r'\1 )', corpus)
     
+    #separate words contracted by apostrophes (and the apostrophe)
+    corpus = re.sub(r"([^ ])' ", r"\1 ' ", corpus)
+    corpus = re.sub(r"'([^ ]+) ", r" ' \1 ", corpus)
 
     corpus = re.sub('"', '', corpus)
+
+    
 
     corpus = re.sub('\. ', ' . _END_ _START_ ', corpus)
     corpus = re.sub('\? ', ' ? _END_ _START_ ', corpus)
     corpus = re.sub('! ', ' ! _END_ _START_ ', corpus)
-    #corpus = re.sub('\." ', '." _END_ _START_ ', corpus)
+    corpus = re.sub("\.' ", ".' _END_ _START_ ", corpus)
     #corpus = re.sub('\?" ', '?" _END_ _START_ ', corpus)
     #corpus = re.sub('!" ', '!" _END_ _START_ ', corpus)
         

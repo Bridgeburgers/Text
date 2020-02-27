@@ -3,14 +3,14 @@ from collections import Counter
 import numpy as np
 import tensorflow as tf
 
-sys.path.append('D:/Documents/PythonCode/Text/')
+#sys.path.append('D:/Documents/PythonCode/Text/')
 from UrlToText import UrlToText
 
 #%%
 seqSize = 300
 batchSize = 16
-embeddingSize = 256
-lstmSize = 256
+embeddingSize = 300
+lstmSize = 300
 dropoutKeep = 0.7
 gradientsNorm = 5 #norm to clip gradients
 nEpochs = 20
@@ -146,4 +146,7 @@ for e in range(nEpochs):
                 predict(model, vocabToInt, intToVocab, nVocab)
 
 #%%
-                
+model.save_weights('E:/ArielS/weights')
+
+q = RNN(nVocab, embeddingSize, lstmSize)
+q.load_weights('E:/ArielS/weights')
