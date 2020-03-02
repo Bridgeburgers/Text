@@ -39,7 +39,7 @@ def CleanCorpus(corpus):
     #corpus = re.sub('!" ', '!" _END_ _START_ ', corpus)
         
     return corpus
-
+    
 #%%
 def UrlToText(urls):
     if not isinstance(urls, list) and not isinstance(urls, np.ndarray):
@@ -57,4 +57,17 @@ def UrlToText(urls):
     text = ''
     for t in corpuses: text = text + t
 
+    return text
+
+#%%
+def CleanText(text):
+    """
+    Does roughly the inverse of CleanCorpus to make the output of LSTM readable
+    """
+    punctuation = [',', ';', '-', ':', '_', '']
+    for punc in punctuation:
+        text = re.sub(' ' + punc, punc, text)
+        
+    text = re.sub(" ", "", text)
+    
     return text

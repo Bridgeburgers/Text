@@ -1,19 +1,9 @@
-import sys
 from collections import Counter
 import numpy as np
 import tensorflow as tf
+import pickle
 
 #sys.path.append('D:/Documents/PythonCode/Text/')
-from UrlToText import UrlToText
-
-#%%
-seqSize = 300
-batchSize = 16
-embeddingSize = 300
-lstmSize = 300
-dropoutKeep = 0.7
-gradientsNorm = 5 #norm to clip gradients
-nEpochs = 20
 #%%
 
 def GetText(text, batch_size, seq_size):
@@ -59,6 +49,13 @@ class RNN(tf.keras.Model):
     def ZeroState(self, batchSize=1):
         return [tf.zeros([batchSize, self.lstmSize]),
                 tf.zeros([batchSize, self.lstmSize])]
+        
+    def PredictIncrement(self, intWord, state, temp=1):
+        intWord = tf.convert_to_tensor(
+                [[intWord]], dtype=tf.float32)
+        _, intPred, valState = self.call(intWord, state, temp=temp)
+        intProbs = intPred.numpy()[0,0]
+        return intProbs, valState
 
 def get_word(int_pred, n_vocab, top=5):
     p = np.squeeze(int_pred)
@@ -69,6 +66,7 @@ def get_word(int_pred, n_vocab, top=5):
 
     return word
 
+#%%
 def predict(model, vocab_to_int, int_to_vocab, n_vocab, temp=1):
 
     val_state = model.ZeroState(1)
@@ -88,6 +86,9 @@ def predict(model, vocab_to_int, int_to_vocab, n_vocab, temp=1):
         int_word = get_word(int_pred, n_vocab)
         words.append(int_to_vocab[int_word])
     print(' '.join(words))
+    
+def Predict(model, item, temp=1):
+    predict(model, item['vocabToInt'], item['intToVocab'], item['nVocab'], temp=temp)
 
 
 @tf.function
@@ -102,51 +103,21 @@ def train_func(inputs, targets, model, state, loss_func, optimizer):
           zip(gradients, model.trainable_variables))
       return loss
 
-#%%
-#load Mark Twain text  
-urls = [
-        'https://digihum.mcgill.ca/wp-content/uploads/2014/02/Connecticut_Yankee.txt',
-        'https://digihum.mcgill.ca/wp-content/uploads/2014/02/Huckleberry_Finn.txt',
-        'https://digihum.mcgill.ca/wp-content/uploads/2014/02/Tom_Sawyer.txt',
-        'https://digihum.mcgill.ca/wp-content/uploads/2014/02/Mississippi.txt',
-        'https://digihum.mcgill.ca/wp-content/uploads/2014/02/Innocents_Abroad.txt'
-        ]
-
-text = UrlToText(urls) 
-#%%
-intToVocab, vocabToInt, nVocab, inText, outText = GetText(text, batchSize, seqSize)
-    
-lenData = inText.shape[0]
-stepsPerEpoch = lenData // batchSize
-    
-dataset = tf.data.Dataset.from_tensor_slices((inText, outText)).shuffle(100)
-dataset = dataset.batch(batchSize, drop_remainder=True)
-
-model = RNN(nVocab, embeddingSize, lstmSize)
-
-state = model.ZeroState(batchSize)
-
-optimizer = tf.keras.optimizers.Adam()
-    
-lossFunc = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
 #%%
-for e in range(nEpochs):
-    state = model.ZeroState(batchSize)
-
-    for (batch, (inputs, targets)) in enumerate(dataset.take(stepsPerEpoch)):
-        loss = train_func(inputs, targets, model, state, lossFunc, optimizer)
-
-        if batch % 50 == 0:
-            print('Epoch: {}/{}'.format(e, nEpochs),
-                  'Batch: {}'.format(batch),
-                  'Loss: {}'.format(loss.numpy()))
-                    
-            if batch % 150 == 0:
-                predict(model, vocabToInt, intToVocab, nVocab)
-
-#%%
-model.save_weights('E:/ArielS/weights')
-
-q = RNN(nVocab, embeddingSize, lstmSize)
-q.load_weights('E:/ArielS/weights')
+def SaveModel(outFile, model, intToVocab, vocabToInt, nVocab):
+    model.save_weights(outFile)
+    item = {'intToVocab':intToVocab, 'vocabToInt':vocabToInt, 'nVocab':nVocab, 
+            'embeddingSize':model.embedding.output_dim, 'lstmSize':model.lstmSize}
+    with open(outFile + 'Item', 'wb') as output:
+        pickle.dump(item, output)
+        
+def LoadModel(inFile):
+    inItem = inFile + 'Item'
+    with open(inItem, 'rb') as input:
+        item = pickle.load(input)
+        
+    model = RNN(nVocab=item['nVocab'], 
+                embeddingSize=item['embeddingSize'], lstmSize=item['lstmSize'])
+    model.load_weights(inFile)
+    return model, item
