@@ -6,10 +6,12 @@ import pickle
 #sys.path.append('D:/Documents/PythonCode/Text/')
 #%%
 
-def GetText(text, batch_size, seq_size):
+def GetText(text, batch_size, seq_size, minOccurrence=0):
     text = text.split()
 
     word_counts = Counter(text)
+    if minOccurrence > 0:
+        word_counts = {k:v for k,v in word_counts.items() if v >= minOccurrence}
     sorted_vocab = sorted(word_counts, key=word_counts.get, reverse=True)
     int_to_vocab = {k: w for k, w in enumerate(sorted_vocab)}
     vocab_to_int = {w: k for k, w in int_to_vocab.items()}
@@ -17,7 +19,7 @@ def GetText(text, batch_size, seq_size):
 
     print('Vocabulary size', n_vocab)
 
-    int_text = [vocab_to_int[w] for w in text]
+    int_text = [vocab_to_int[w] for w in text if w in word_counts.keys()]
     num_batches = int(len(int_text) / (seq_size * batch_size))
     in_text = int_text[:num_batches * batch_size * seq_size]
     out_text = np.zeros_like(in_text)

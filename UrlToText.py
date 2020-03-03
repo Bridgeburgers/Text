@@ -1,7 +1,6 @@
 import urllib.request
 import re
 import numpy as np
-
 #%%
 def CleanCorpus(corpus):
     
@@ -41,6 +40,22 @@ def CleanCorpus(corpus):
     return corpus
     
 #%%
+def COCClean(text): 
+    text = re.sub('@[0-9]+', '', text)
+    text = re.sub('@', '', text)
+    text = re.sub('<p>', '', text)
+    text = re.sub('<h>', '', text)
+
+    text = CleanCorpus(text)
+#    text = re.sub('[' + ''.join(spaceStrings) + ']+', ' ', text)
+#    
+#    text = re.sub('\. ', ' . _END_ _START_ ', text)
+#    text = re.sub('\? ', ' ? _END_ _START_ ', text)
+#    text = re.sub('! ', ' ! _END_ _START_ ', text)
+#    text = re.sub("\.' ", ".' _END_ _START_ ", text)
+    
+    return text
+#%%
 def UrlToText(urls):
     if not isinstance(urls, list) and not isinstance(urls, np.ndarray):
         urls = [urls]
@@ -59,6 +74,27 @@ def UrlToText(urls):
 
     return text
 
+#%%
+def FilesToText(files, coc=True):
+    if not isinstance(files, list) and not isinstance(files, np.ndarray):
+        files = [files]
+        
+    corpuses = []
+    
+    for file in files:
+        with open(file, 'r') as input:
+            textStr = input.read()
+        if coc:
+            textStr = COCClean(textStr)
+        else:
+            textStr = CleanCorpus(textStr)
+        corpuses.append(textStr)
+        
+    text = ''
+    for t in corpuses:
+        text = text + t
+        
+    return text
 #%%
 def CleanText(text):
     """

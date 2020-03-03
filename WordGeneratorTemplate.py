@@ -1,4 +1,5 @@
-from UrlToText import UrlToText
+import os
+from UrlToText import UrlToText, FilesToText
 from WordGenerator import GetText, RNN, get_word, predict, Predict, train_func, SaveModel, LoadModel
 import tensorflow as tf
 import numpy as np
@@ -12,6 +13,13 @@ lstmSize = 512
 dropoutKeep = 0.7
 gradientsNorm = 5 #norm to clip gradients
 nEpochs = 50
+
+#%%
+#load COC text
+path = 'E:/ArielS/TempData/TextData/CoC/'
+files = os.listdir(path)
+files = [path + f for f in files]
+text = FilesToText(files, coc=True)
 #%%
 #load Mark Twain text  
 urls = [
@@ -24,7 +32,7 @@ urls = [
 
 text = UrlToText(urls) 
 #%%
-intToVocab, vocabToInt, nVocab, inText, outText = GetText(text, batchSize, seqSize)
+intToVocab, vocabToInt, nVocab, inText, outText = GetText(text, batchSize, seqSize, minOccurrence=11)
     
 lenData = inText.shape[0]
 stepsPerEpoch = lenData // batchSize
@@ -58,8 +66,9 @@ for e in range(nEpochs):
 
              
 #%%
-SaveModel('E:/ArielS/Models/MarkTwain', model, intToVocab, vocabToInt, nVocab)
-q, item = LoadModel('E:/ArielS/Models/MarkTwain')
+file = 'E:/ArielS/Models/coc
+SaveModel(file, model, intToVocab, vocabToInt, nVocab)
+q, item = LoadModel(file)
 Predict(q, item)
 vocabToInt, intToVocab, nVocab = item['vocabToInt'], item['intToVocab'], item['nVocab']
 
@@ -79,3 +88,22 @@ while word != '_END_':
 t = timeit.default_timer() - t
 print(' '.join(words))
 print(str(t) + ' seconds')
+
+#%%
+#%%
+from PhraseSearch import Searcher
+#%%
+#do a phrase search
+c = 0.5
+beta = 2.5
+probPower = 0.4
+inputPhrase = 'I have not found my way.'
+
+searcher = Searcher(model, item, inputPhrase, c=c, beta=beta, probPower=probPower)
+
+#%%
+t = timeit.default_timer()
+searcher.Search(nIterations=50000, resetTree=False, printWithEnd=True)
+t = timeit.default_timer() - t
+print(t)
+d = searcher.phrases
