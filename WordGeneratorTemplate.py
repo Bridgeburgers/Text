@@ -4,10 +4,11 @@ from WordGenerator import GetText, RNN, get_word, predict, Predict, train_func, 
 import tensorflow as tf
 import numpy as np
 import timeit
+import gc
 #%%
 #%%
-seqSize = 300
-batchSize = 16
+seqSize = 200
+batchSize = 32
 embeddingSize = 256
 lstmSize = 512
 dropoutKeep = 0.7
@@ -62,14 +63,12 @@ for e in range(nEpochs):
                     
             if batch % 150 == 0:
                 predict(model, vocabToInt, intToVocab, nVocab)
-
-
-             
+                gc.collect()             
 #%%
-file = 'E:/ArielS/Models/coc
-SaveModel(file, model, intToVocab, vocabToInt, nVocab)
-q, item = LoadModel(file)
-Predict(q, item)
+file = 'E:/ArielS/Models/coc'
+#SaveModel(file, model, intToVocab, vocabToInt, nVocab)
+model, item = LoadModel(file)
+Predict(model, item)
 vocabToInt, intToVocab, nVocab = item['vocabToInt'], item['intToVocab'], item['nVocab']
 
 #%%
@@ -79,9 +78,9 @@ words = []
 temp=1
 intWord = vocabToInt['_START_']
 word = '_START_'
-state = q.ZeroState()
+state = model.ZeroState()
 while word != '_END_':
-    probs, state = q.PredictIncrement(intWord, state, temp)
+    probs, state = model.PredictIncrement(intWord, state, temp)
     intWord = np.random.choice(range(nVocab), p=probs)
     word = intToVocab[intWord]
     words.append(word)
@@ -94,16 +93,16 @@ print(str(t) + ' seconds')
 from PhraseSearch import Searcher
 #%%
 #do a phrase search
-c = 0.5
-beta = 2.5
+c = 0.4
+beta = 8
 probPower = 0.4
-inputPhrase = 'I have not found my way.'
+inputPhrase = 'Eat this cornbread.'
 
 searcher = Searcher(model, item, inputPhrase, c=c, beta=beta, probPower=probPower)
 
 #%%
 t = timeit.default_timer()
-searcher.Search(nIterations=50000, resetTree=False, printWithEnd=True)
+searcher.Search(nIterations=5000, resetTree=False, printWithEnd=True)
 t = timeit.default_timer() - t
 print(t)
 d = searcher.phrases

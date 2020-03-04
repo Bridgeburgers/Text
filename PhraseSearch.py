@@ -38,10 +38,18 @@ def Utility(phrase, inputVector, probs, beta=1):
     
     return utility
 
+def TopNProbs(p, N):
+    if len(p) < N:
+        return p, list(range(len(p)))
+    
+    inds = np.argpartition(p, -N)[-N:]
+    return p[inds], inds
+    
+
 #%%
 class Node:
     
-    def __init__(self, word, prob, state, phraseProbs, phrase=[]):
+    def __init__(self, word, prob, childWords, state, phraseProbs, phrase=[]):
         self.word = word
         self.phrase = phrase + [word]
         self.p = prob #probability of children nodes
@@ -50,6 +58,9 @@ class Node:
         self.N = 0 #number of visits
         self.childVisits = np.zeros(len(prob))
         self.childQs = np.zeros(len(prob))
+        #self.childVisits = {}
+        #self.childQs = {}
+        self.childWords = childWords
         self.state = state
         self.root = False
         self.phraseProbs = phraseProbs
@@ -57,7 +68,7 @@ class Node:
 #%%  
 class Searcher:
     
-    def __init__(self, model, item, inputPhrase, c=0.5, beta=1, probPower=1):
+    def __init__(self, model, item, inputPhrase, c=0.5, beta=1, probPower=1, topWords=1000):
         
         self.vocabToInt = item['vocabToInt']
         self.intToVocab = item['intToVocab']
@@ -66,6 +77,7 @@ class Searcher:
         self.beta = beta
         self.c = c
         self.probPower = probPower
+        self.topWords = topWords
         self.inputPhrase = inputPhrase
         
         self.startToken = self.vocabToInt['_START_']
@@ -74,7 +86,10 @@ class Searcher:
         startingProb, startingState = model.PredictIncrement(
                 self.startToken, model.ZeroState())
         
-        self.tree = Node(self.startToken, startingProb, startingState, [], phrase=[])
+        startingProb, startingChildWords = TopNProbs(startingProb, self.topWords)
+        
+        self.tree = Node(self.startToken, startingProb, 
+                         startingChildWords, startingState, [], phrase=[])
         self.tree.root = True
         
         #create the input embedding vector by embedding inputPhrase
@@ -99,7 +114,6 @@ class Searcher:
     
     def SearchNode(self, node):
         node.N += 1
-        
         #if currentNode is a leaf, evaluate and backpropagate
         if node.N == 1:
             #evaluate utility
@@ -121,18 +135,21 @@ class Searcher:
         #keep traversing
         #get child with highest childUtility
         childUtilities = self.ChildUtilities(node)
-        nextWord = np.argmax(childUtilities)
-        nextProb = node.p[nextWord]
-        childPhraseProbs = node.phraseProbs + [nextProb]
-        if node.childVisits[nextWord] == 0:
+        nextWordInd = np.argmax(childUtilities)
+        nextWord = node.childWords[nextWordInd]
+        if node.childVisits[nextWordInd] == 0:
+            nextProb = node.p[nextWordInd]
+            childPhraseProbs = node.phraseProbs + [nextProb]
             #create state and prob objects by incrementing the generator model
             childProbs, childState = self.model.PredictIncrement(nextWord, node.state)
-            childNode = Node(nextWord, childProbs, childState, childPhraseProbs, node.phrase)
+            childProbs, childChildWords = TopNProbs(childProbs, self.topWords)
+            childNode = Node(nextWord, childProbs, childChildWords,
+                             childState, childPhraseProbs, node.phrase)
             node.childNodes[nextWord] = childNode
             
-        node.childVisits[nextWord] += 1
+        node.childVisits[nextWordInd] += 1
         childQ = self.SearchNode(node.childNodes[nextWord])
-        node.childQs[nextWord] = node.childNodes[nextWord].Q
+        node.childQs[nextWordInd] = node.childNodes[nextWord].Q
         return childQ
         
     def Search(self, nIterations=1000, resetTree=False, printWithEnd=True):
@@ -140,8 +157,10 @@ class Searcher:
             self.phrases = pd.DataFrame({'phrase':[], 'utility':[]})
             startingProb, startingState = self.model.PredictIncrement(
                 self.startToken, self.model.ZeroState())
+            startingProb, startingChildWords = TopNProbs(startingProb, self.topWords)
         
-            self.tree = Node(self.startToken, startingProb, startingState, [], phrase=[])
+            self.tree = Node(self.startToken, startingProb, 
+                             startingChildWords, startingState, [], phrase=[])
             self.tree.root = True
             
         for _ in range(nIterations):
