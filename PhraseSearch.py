@@ -12,7 +12,7 @@ def CosSimilarity(x,y):
     cos = dotProduct / xMag / yMag
     return cos
 
-def Utility(phrase, inputVector, probs, beta=1):
+def Utility(phrase, inputVector, probs, beta=1, cosPower=1):
     """
     params
     ------
@@ -31,7 +31,7 @@ def Utility(phrase, inputVector, probs, beta=1):
     phraseIntegrity = np.power(np.prod(probs), 1/len(probs))
     
     phraseEmbedding = np.array( transformer.encode([phrase]) )[0]
-    contentSimilarity = CosSimilarity(phraseEmbedding, inputVector)
+    contentSimilarity = CosSimilarity(phraseEmbedding, inputVector)**cosPower
     
     #get weighted harmonic mean, weighting cosSimilarity with beta
     utility = (1 + beta) / (1/phraseIntegrity + beta/contentSimilarity)
@@ -68,16 +68,20 @@ class Node:
 #%%  
 class Searcher:
     
-    def __init__(self, model, item, inputPhrase, c=0.5, beta=1, probPower=1, topWords=1000):
+    def __init__(self, model, item, inputPhrase, c=0.5, beta=1, 
+                 probPower=1, cosPower=1, topWords=[1000]):
         
         self.vocabToInt = item['vocabToInt']
         self.intToVocab = item['intToVocab']
         self.nVocab = item['nVocab']
         self.model = model
         self.beta = beta
+        self.cosPower = cosPower
         self.c = c
         self.probPower = probPower
         self.topWords = topWords
+        if not isinstance(self.topWords, list):
+            self.topWords = [self.topWords]
         self.inputPhrase = inputPhrase
         
         self.startToken = self.vocabToInt['_START_']
@@ -86,7 +90,7 @@ class Searcher:
         startingProb, startingState = model.PredictIncrement(
                 self.startToken, model.ZeroState())
         
-        startingProb, startingChildWords = TopNProbs(startingProb, self.topWords)
+        startingProb, startingChildWords = TopNProbs(startingProb, self.topWords[0])
         
         self.tree = Node(self.startToken, startingProb, 
                          startingChildWords, startingState, [], phrase=[])
@@ -103,7 +107,7 @@ class Searcher:
         if '_END_' in textPhrase:
             textPhrase.remove('_END_')
         textPhrase = ' '.join(textPhrase)
-        utility = Utility(textPhrase, self.inputVector, phraseProbs, self.beta)
+        utility = Utility(textPhrase, self.inputVector, phraseProbs, self.beta, self.cosPower)
         return utility
     
     def ChildUtilities(self, node):
@@ -142,7 +146,8 @@ class Searcher:
             childPhraseProbs = node.phraseProbs + [nextProb]
             #create state and prob objects by incrementing the generator model
             childProbs, childState = self.model.PredictIncrement(nextWord, node.state)
-            childProbs, childChildWords = TopNProbs(childProbs, self.topWords)
+            topWordsInd = min(len(node.phrase), len(self.topWords)-1)
+            childProbs, childChildWords = TopNProbs(childProbs, self.topWords[topWordsInd])
             childNode = Node(nextWord, childProbs, childChildWords,
                              childState, childPhraseProbs, node.phrase)
             node.childNodes[nextWord] = childNode
@@ -157,7 +162,7 @@ class Searcher:
             self.phrases = pd.DataFrame({'phrase':[], 'utility':[]})
             startingProb, startingState = self.model.PredictIncrement(
                 self.startToken, self.model.ZeroState())
-            startingProb, startingChildWords = TopNProbs(startingProb, self.topWords)
+            startingProb, startingChildWords = TopNProbs(startingProb, self.topWords[0])
         
             self.tree = Node(self.startToken, startingProb, 
                              startingChildWords, startingState, [], phrase=[])

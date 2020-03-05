@@ -26,8 +26,12 @@ def CleanCorpus(corpus):
     corpus = re.sub(r"([^ ])' ", r"\1 ' ", corpus)
     corpus = re.sub(r"'([^ ]+) ", r" ' \1 ", corpus)
 
+    #remove all double quotes
     corpus = re.sub('"', '', corpus)
-
+    
+    #convert all words containing numbers into _NUMBER_
+    corpus = re.sub('[^ ]*[0-9]+[^ ]*', '_NUMBER_', corpus)
+    
     
 
     corpus = re.sub('\. ', ' . _END_ _START_ ', corpus)
