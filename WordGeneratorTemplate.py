@@ -1,6 +1,6 @@
 import os
 from UrlToText import UrlToText, FilesToText
-from WordGenerator import GetText, RNN, get_word, predict, Predict, train_func, SaveModel, LoadModel
+from WordGenerator import GetText, RNN, GetWord, predict, Predict, train_func, SaveModel, LoadModel
 import tensorflow as tf
 import numpy as np
 import timeit
@@ -65,7 +65,7 @@ for e in range(nEpochs):
                 predict(model, vocabToInt, intToVocab, nVocab)
                 gc.collect()             
 #%%
-file = 'E:/ArielS/Models/coc'
+file = 'D:/Documents/TempWts/MarkTwain'
 #SaveModel(file, model, intToVocab, vocabToInt, nVocab)
 model, item = LoadModel(file)
 Predict(model, item)
