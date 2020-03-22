@@ -1,6 +1,6 @@
 import os
 from UrlToText import UrlToText, FilesToText
-from WordGenerator import GetText, RNN, GetWord, predict, Predict, train_func, SaveModel, LoadModel
+from WordGenerator import GetText, RNN, RNN2, GetWord, predict, Predict, train_func, SaveModel, LoadModel
 import tensorflow as tf
 import numpy as np
 import timeit
@@ -11,7 +11,7 @@ seqSize = 200
 batchSize = 32
 embeddingSize = 256
 lstmSize = 512
-dropoutKeep = 0.7
+dropout = 0.4
 gradientsNorm = 5 #norm to clip gradients
 nEpochs = 50
 
@@ -34,6 +34,8 @@ urls = [
 text = UrlToText(urls) 
 #%%
 intToVocab, vocabToInt, nVocab, inText, outText = GetText(text, batchSize, seqSize, minOccurrence=11)
+item = {'intToVocab': intToVocab, 'vocabToInt': vocabToInt, 'nVocab': nVocab,
+        'embeddingSize': embeddingSize, 'lstmSize': lstmSize}
     
 lenData = inText.shape[0]
 stepsPerEpoch = lenData // batchSize
@@ -41,7 +43,7 @@ stepsPerEpoch = lenData // batchSize
 dataset = tf.data.Dataset.from_tensor_slices((inText, outText)).shuffle(100)
 dataset = dataset.batch(batchSize, drop_remainder=True)
 
-model = RNN(nVocab, embeddingSize, lstmSize)
+model = RNN2(nVocab, embeddingSize, lstmSize, dropout)
 
 state = model.ZeroState(batchSize)
 
@@ -65,7 +67,7 @@ for e in range(nEpochs):
                 predict(model, vocabToInt, intToVocab, nVocab)
                 gc.collect()             
 #%%
-file = 'D:/Documents/TempWts/MarkTwain'
+file = 'D:/Documents/PythonCode/Models/MarkTwain'
 #SaveModel(file, model, intToVocab, vocabToInt, nVocab)
 model, item = LoadModel(file)
 Predict(model, item)
@@ -94,15 +96,15 @@ from PhraseSearch import Searcher
 #%%
 #do a phrase search
 c = 0.4
-beta = 8
-probPower = 0.4
-inputPhrase = 'Eat this cornbread.'
+beta = 800
+probPower = 0.1
+inputPhrase = 'I really wished I could have some of it.'
 
 searcher = Searcher(model, item, inputPhrase, c=c, beta=beta, probPower=probPower)
 
 #%%
 t = timeit.default_timer()
-searcher.Search(nIterations=5000, resetTree=False, printWithEnd=True)
+searcher.Search(nIterations=10000, resetTree=False, printWithEnd=True)
 t = timeit.default_timer() - t
 print(t)
 d = searcher.phrases

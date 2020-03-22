@@ -31,17 +31,21 @@ def GetText(text, batchSize, seqSize, minOccurrence=0):
 
 
 class RNN(tf.keras.Model):
-    def __init__(self, nVocab=None, embeddingSize=None, lstmSize=None):
+    def __init__(self, nVocab=None, embeddingSize=None, lstmSize=None, dropout=0):
         super(RNN, self).__init__()
         if nVocab is not None and embeddingSize is not None and lstmSize is not None:
             self.lstmSize = lstmSize
             self.embedding = tf.keras.layers.Embedding(
                 nVocab, embeddingSize)
             self.lstm = tf.keras.layers.LSTM(
-                lstmSize, return_state=True, return_sequences=True)
+                lstmSize, return_state=True, return_sequences=True, dropout=dropout)
             self.dense = tf.keras.layers.Dense(nVocab)
 
     def call(self, x, prevState, temp=1):
+        """
+        Note that input state is in the form [stateH, stateC], each of which has shape
+        [batchSize, seqSize, lstmSize]
+        """
         embed = self.embedding(x)
         output, stateH, stateC = self.lstm(embed, prevState)
         logits = self.dense(output)
@@ -58,6 +62,48 @@ class RNN(tf.keras.Model):
         _, intPred, valState = self.call(intWord, state, temp=temp)
         intProbs = intPred.numpy()[0,0]
         return intProbs, valState
+    
+    def PhraseProb(self, intWords, temp=1):
+        phraseProbs = []
+        state = self.ZeroState()
+        probs, state = self.PredictIncrement(intWords[0], state, temp)
+        for intWord in intWords[1:]:
+            if intWord >= len(probs):
+                raise ValueError('int word beyond vocabulary size')
+            phraseProbs.append(probs[intWord])
+            probs, state = self.PredictIncrement(intWord, state, temp)
+        return phraseProbs
+    
+class RNN2(RNN):
+    """
+    2-layered LSTM as child of RNN
+    """
+    def __init__(self, nVocab=None, embeddingSize=None, lstmSize=None, dropout=0):
+        super(RNN, self).__init__()
+        if nVocab is not None and embeddingSize is not None and lstmSize is not None:
+            self.lstmSize = lstmSize
+            self.embedding = tf.keras.layers.Embedding(
+                nVocab, embeddingSize)
+            self.lstm = tf.keras.layers.LSTM(
+                lstmSize, return_state=True, return_sequences=True, dropout=dropout)
+            self.lstm2 = tf.keras.layers.LSTM(
+                lstmSize, return_state=True, return_sequences=True, dropout=dropout)
+            self.dense = tf.keras.layers.Dense(nVocab)      
+            
+    def call(self, x, prevState, temp=1):
+        """
+        note that the input state has the form [[stateH1, stateC1], [stateH2, stateC2]]
+        this a list of 2 copies of the output state for RNN, one for each LSTM layer
+        """
+        embed = self.embedding(x)
+        secondInput, stateH1, stateC1 = self.lstm(embed, prevState[0])
+        output, stateH2, stateC2 = self.lstm2(secondInput, prevState[1])
+        logits = self.dense(output)
+        preds = tf.nn.softmax(temp * logits)
+        return logits, preds, [(stateH1, stateC1), (stateH2, stateC2)]
+    
+    def ZeroState(self, batchSize=1):
+        return [super().ZeroState(batchSize), super().ZeroState(batchSize)]
 
 def GetWord(intPred, nVocab, top=5):
     p = np.squeeze(intPred)
@@ -69,10 +115,9 @@ def GetWord(intPred, nVocab, top=5):
     return word
 
 #%%
-def predict(model, vocabToInt, intToVocab, nVocab, temp=1):
+def predict(model, vocabToInt, intToVocab, nVocab, temp=1, words=['_START_']):
 
     valState = model.ZeroState(1)
-    words = ['_START_']
     for word in words:
         intWord = tf.convert_to_tensor(
             [[vocabToInt[word]]], dtype=tf.float32)

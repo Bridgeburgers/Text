@@ -36,7 +36,7 @@ def Utility(phrase, inputVector, probs, beta=1, cosPower=1):
     #get weighted harmonic mean, weighting cosSimilarity with beta
     utility = (1 + beta) / (1/phraseIntegrity + beta/contentSimilarity)
     
-    return utility
+    return utility, phraseIntegrity, contentSimilarity
 
 def TopNProbs(p, N):
     if len(p) < N:
@@ -101,14 +101,34 @@ class Searcher:
         
         self.phrases = pd.DataFrame({'phrase':[], 'utility':[]})
     
+    def PhraseToIntWords(self, phrase):
+        phraseList = phrase.split()
+        intWords = []
+        for word in phraseList:
+            if not word in self.vocabToInt.keys():
+                raise ValueError(word + ' not in vocabulary')
+            intWords.append(self.vocabToInt[word])
+        return intWords
+    
+    def GetPhraseProbs(self, phrase, temp=1):
+        intWords = self.PhraseToIntWords(phrase)
+        probs = self.model.PhraseProb(intWords, temp=temp)
+        return probs
+    
     def PhraseUtility(self, textPhrase, phraseProbs):
         if '_START_' in textPhrase:
             textPhrase.remove('_START_')
         if '_END_' in textPhrase:
             textPhrase.remove('_END_')
         textPhrase = ' '.join(textPhrase)
-        utility = Utility(textPhrase, self.inputVector, phraseProbs, self.beta, self.cosPower)
-        return utility
+        utility, integrity, similarity =\
+            Utility(textPhrase, self.inputVector, phraseProbs, self.beta, self.cosPower)
+        return utility, integrity, similarity
+    
+    def PhraseUtilityProbs(self, phrase, temp=1):
+        phraseList = phrase.split()
+        phraseProbs = self.GetPhraseProbs(phrase, temp=temp)
+        return self.PhraseUtility(phraseList, phraseProbs)
     
     def ChildUtilities(self, node):
         childUtilities = node.childQs + self.c * np.power(node.p, self.probPower) *\
@@ -122,7 +142,7 @@ class Searcher:
         if node.N == 1:
             #evaluate utility
             textPhrase = [self.intToVocab[j] for j in node.phrase]
-            phraseUtility = self.PhraseUtility(textPhrase.copy(), node.phraseProbs)
+            phraseUtility, _, _ = self.PhraseUtility(textPhrase.copy(), node.phraseProbs)
             
             self.phrases = self.phrases.append(
                     {'phrase': ' '.join(textPhrase), 'utility': phraseUtility},
