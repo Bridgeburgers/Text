@@ -116,7 +116,6 @@ def GetWord(intPred, nVocab, top=5):
 
 #%%
 def predict(model, vocabToInt, intToVocab, nVocab, temp=1, words=['_START_']):
-
     valState = model.ZeroState(1)
     for word in words:
         intWord = tf.convert_to_tensor(
@@ -135,7 +134,8 @@ def predict(model, vocabToInt, intToVocab, nVocab, temp=1, words=['_START_']):
     print(' '.join(words))
     
 def Predict(model, item, temp=1):
-    predict(model, item['vocabToInt'], item['intToVocab'], item['nVocab'], temp=temp)
+    predict(model, item['vocabToInt'], item['intToVocab'], item['nVocab'], 
+            temp=temp, words=['_START_'])
 
 
 @tf.function
@@ -153,18 +153,24 @@ def train_func(inputs, targets, model, state, loss_func, optimizer):
 
 #%%
 def SaveModel(outFile, model, intToVocab, vocabToInt, nVocab):
-    model.save_weights(outFile)
+    model.save_weights(outFile + '.h5')
     item = {'intToVocab':intToVocab, 'vocabToInt':vocabToInt, 'nVocab':nVocab, 
             'embeddingSize':model.embedding.output_dim, 'lstmSize':model.lstmSize}
     with open(outFile + 'Item', 'wb') as output:
         pickle.dump(item, output)
         
-def LoadModel(inFile):
+def LoadModel(inFile, modelNum=1, dropout=0):
     inItem = inFile + 'Item'
     with open(inItem, 'rb') as input:
         item = pickle.load(input)
-        
-    model = RNN(nVocab=item['nVocab'], 
-                embeddingSize=item['embeddingSize'], lstmSize=item['lstmSize'])
-    model.load_weights(inFile)
+    
+    if modelNum==1:
+        model = RNN(nVocab=item['nVocab'], 
+                    embeddingSize=item['embeddingSize'], lstmSize=item['lstmSize'],
+                    dropout=dropout)
+    elif modelNum==2:
+        model = RNN2(nVocab=item['nVocab'], 
+                    embeddingSize=item['embeddingSize'], lstmSize=item['lstmSize'],
+                    dropout=dropout)
+    model.load_weights(inFile + '.h5')
     return model, item

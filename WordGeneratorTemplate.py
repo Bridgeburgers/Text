@@ -9,11 +9,11 @@ import gc
 #%%
 seqSize = 200
 batchSize = 32
-embeddingSize = 256
-lstmSize = 512
-dropout = 0.4
+embeddingSize = 1024
+lstmSize = 2048
+dropout = 0.3
 gradientsNorm = 5 #norm to clip gradients
-nEpochs = 50
+nEpochs = 100
 
 #%%
 #load COC text
@@ -33,7 +33,7 @@ urls = [
 
 text = UrlToText(urls) 
 #%%
-intToVocab, vocabToInt, nVocab, inText, outText = GetText(text, batchSize, seqSize, minOccurrence=11)
+intToVocab, vocabToInt, nVocab, inText, outText = GetText(text, batchSize, seqSize, minOccurrence=6)
 item = {'intToVocab': intToVocab, 'vocabToInt': vocabToInt, 'nVocab': nVocab,
         'embeddingSize': embeddingSize, 'lstmSize': lstmSize}
     
@@ -43,7 +43,7 @@ stepsPerEpoch = lenData // batchSize
 dataset = tf.data.Dataset.from_tensor_slices((inText, outText)).shuffle(100)
 dataset = dataset.batch(batchSize, drop_remainder=True)
 
-model = RNN2(nVocab, embeddingSize, lstmSize, dropout)
+model = RNN(nVocab, embeddingSize, lstmSize, dropout)
 
 state = model.ZeroState(batchSize)
 
@@ -51,6 +51,7 @@ optimizer = tf.keras.optimizers.Adam()
     
 lossFunc = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
+file = 'D:/Documents/PythonCode/Models/MarkTwain3'
 #%%
 for e in range(nEpochs):
     state = model.ZeroState(batchSize)
@@ -64,12 +65,14 @@ for e in range(nEpochs):
                   'Loss: {}'.format(loss.numpy()))
                     
             if batch % 150 == 0:
-                predict(model, vocabToInt, intToVocab, nVocab)
-                gc.collect()             
+                predict(model, vocabToInt, intToVocab, nVocab, words=['_START_'])
+                gc.collect()    
+                
+    if e % 5 == 0:
+        SaveModel(file, model, intToVocab, vocabToInt, nVocab)
 #%%
-file = 'D:/Documents/PythonCode/Models/MarkTwain'
 #SaveModel(file, model, intToVocab, vocabToInt, nVocab)
-model, item = LoadModel(file)
+model, item = LoadModel(file, modelNum=1)
 Predict(model, item)
 vocabToInt, intToVocab, nVocab = item['vocabToInt'], item['intToVocab'], item['nVocab']
 
@@ -94,15 +97,20 @@ print(str(t) + ' seconds')
 #%%
 from PhraseSearch import Searcher
 #%%
-#do a phrase search
+#create a searcher
 c = 0.4
-beta = 800
+beta = 1000
 probPower = 0.1
-inputPhrase = 'I really wished I could have some of it.'
+topWords = [300, 100]
+inputPhrase = 'Well, it goes to show the importance of foresight and being prepared.'
 
 searcher = Searcher(model, item, inputPhrase, c=c, beta=beta, probPower=probPower)
-
 #%%
+#test utility function with an original phrase from the text
+originalPhrase = '_START_ well , it shows the value of looking ahead , and being ready for a thing when it comes . _END_'
+searcher.PhraseUtilityProbs(originalPhrase)
+#%%
+#do a phrase search using MCTS
 t = timeit.default_timer()
 searcher.Search(nIterations=10000, resetTree=False, printWithEnd=True)
 t = timeit.default_timer() - t

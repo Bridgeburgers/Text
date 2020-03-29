@@ -34,7 +34,8 @@ def Utility(phrase, inputVector, probs, beta=1, cosPower=1):
     contentSimilarity = CosSimilarity(phraseEmbedding, inputVector)**cosPower
     
     #get weighted harmonic mean, weighting cosSimilarity with beta
-    utility = (1 + beta) / (1/phraseIntegrity + beta/contentSimilarity)
+    #utility = (1 + beta) / (1/phraseIntegrity + beta/contentSimilarity)
+    utility = (phraseIntegrity + beta * contentSimilarity) / (1 + beta)
     
     return utility, phraseIntegrity, contentSimilarity
 
@@ -188,8 +189,10 @@ class Searcher:
                              startingChildWords, startingState, [], phrase=[])
             self.tree.root = True
             
-        for _ in range(nIterations):
+        for i in range(nIterations):
             self.SearchNode(self.tree)
+            if i % 500 == 0:
+                print('Iteration ' + str(i))
             
         self.BestPhrase(withEnd=printWithEnd)
             
